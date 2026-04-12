@@ -1,0 +1,9 @@
+.git
+.github
+bin
+log
+tmp
+*.exe
+*.log
+*.out
+*.test

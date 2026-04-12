@@ -26,7 +26,7 @@ func (api *api) Match(ctx *gin.Context, model string) (ok bool, err error) {
 	if len(model) <= 9 || Model+"/" != model[:9] {
 		return
 	}
-	for mod := range mapModel {
+	for _, mod := range listModelNames(api.env) {
 		if model[9:] == mod {
 			if strings.HasPrefix(mod, "deepseek") {
 				completion := common.GetGinCompletion(ctx)
@@ -40,8 +40,8 @@ func (api *api) Match(ctx *gin.Context, model string) (ok bool, err error) {
 	return
 }
 
-func (*api) Models() (slice []model.Model) {
-	for mod := range mapModel {
+func (api *api) Models() (slice []model.Model) {
+	for _, mod := range listModelNames(api.env) {
 		slice = append(slice, model.Model{
 			Id:      Model + "/" + mod,
 			Object:  "model",
@@ -54,9 +54,12 @@ func (*api) Models() (slice []model.Model) {
 
 func (api *api) ToolChoice(ctx *gin.Context) (ok bool, err error) {
 	var (
-		cookie     = ctx.GetString("token")
 		completion = common.GetGinCompletion(ctx)
 	)
+	cookie, err := normalizeCredential(ctx.GetString("token"))
+	if err != nil {
+		return false, err
+	}
 
 	if toolChoice(ctx, api.env, cookie, completion) {
 		ok = true
@@ -66,16 +69,21 @@ func (api *api) ToolChoice(ctx *gin.Context) (ok bool, err error) {
 
 func (api *api) Completion(ctx *gin.Context) (err error) {
 	var (
-		cookie     = ctx.GetString("token")
 		completion = common.GetGinCompletion(ctx)
 	)
+	cookie, err := normalizeCredential(ctx.GetString("token"))
+	if err != nil {
+		return err
+	}
 
-	token, err := genToken(ctx.Request.Context(), api.env.GetString("server.proxied"), cookie)
+	ctx.Set(ginTokens, promptTokenCount(completion))
+
+	token, err := genToken(ctx.Request.Context(), api.env, api.env.GetString("server.proxied"), cookie)
 	if err != nil {
 		return
 	}
 
-	buffer, err := convertRequest(completion, cookie, token)
+	buffer, err := convertRequest(api.env, completion, cookie, token)
 	if err != nil {
 		return
 	}
@@ -86,8 +94,15 @@ func (api *api) Completion(ctx *gin.Context) (err error) {
 		return
 	}
 
-	content := waitResponse(ctx, r, completion.Stream)
-	if content == "" && response.NotResponse(ctx) {
+	content, err := waitResponse(ctx, r, completion.Stream)
+	if err != nil {
+		logger.Error(err)
+		if response.NotResponse(ctx) && !ctx.Writer.Written() {
+			response.Error(ctx, -1, err)
+		}
+		return nil
+	}
+	if content == "" && response.NotResponse(ctx) && !ctx.Writer.Written() {
 		response.Error(ctx, -1, "EMPTY RESPONSE")
 	}
 	return

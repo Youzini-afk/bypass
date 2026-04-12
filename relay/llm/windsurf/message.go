@@ -1,12 +1,11 @@
 package windsurf
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/iocgo/sdk/env"
-	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -16,9 +15,8 @@ import (
 	"chatgpt-adapter/core/common/vars"
 	"chatgpt-adapter/core/gin/response"
 	"chatgpt-adapter/core/logger"
-	"github.com/bincooo/emit.io"
 	"github.com/gin-gonic/gin"
-	"github.com/golang/protobuf/proto"
+	"io"
 )
 
 const (
@@ -95,27 +93,22 @@ func (e Error) Error() string {
 
 func waitMessage(r *http.Response, cancel func(str string) bool) (content string, err error) {
 	defer r.Body.Close()
-	scanner := newScanner(r.Body)
+	reader := newStreamReader(r.Body)
 	for {
-		if !scanner.Scan() {
-			break
+		event, readErr := readStreamEvent(reader)
+		if readErr != nil {
+			if errors.Is(readErr, io.EOF) {
+				break
+			}
+			return content, readErr
 		}
 
-		event := scanner.Text()
-		if event == "" {
-			continue
-		}
-
-		if !scanner.Scan() {
-			break
-		}
-
-		chunk := scanner.Bytes()
+		chunk := event.payload
 		if len(chunk) == 0 {
 			continue
 		}
 
-		if event[7:] == "error" {
+		if event.kind == "error" {
 			if bytes.Equal(chunk, []byte("{}")) {
 				break
 			}
@@ -141,7 +134,7 @@ func waitMessage(r *http.Response, cancel func(str string) bool) (content string
 	return content, nil
 }
 
-func waitResponse(ctx *gin.Context, r *http.Response, sse bool) (content string) {
+func waitResponse(ctx *gin.Context, r *http.Response, sse bool) (content string, err error) {
 	defer r.Body.Close()
 	created := time.Now().Unix()
 	logger.Info("waitResponse ...")
@@ -159,22 +152,17 @@ func waitResponse(ctx *gin.Context, r *http.Response, sse bool) (content string)
 		}
 	})
 
-	scanner := newScanner(r.Body)
+	reader := newStreamReader(r.Body)
 	for {
-		if !scanner.Scan() {
-			raw := response.ExecMatchers(matchers, "", true)
-			if raw != "" && sse {
-				response.SSEResponse(ctx, Model, raw, created)
+		event, readErr := readStreamEvent(reader)
+		if readErr != nil {
+			if !errors.Is(readErr, io.EOF) {
+				if response.NotResponse(ctx) && !ctx.Writer.Written() {
+					response.Error(ctx, -1, readErr)
+				}
+				return content, readErr
 			}
-			content += raw
-			break
-		}
-		event := scanner.Text()
-		if event == "" {
-			continue
-		}
 
-		if !scanner.Scan() {
 			raw := response.ExecMatchers(matchers, "", true)
 			if raw != "" && sse {
 				response.SSEResponse(ctx, Model, raw, created)
@@ -183,12 +171,12 @@ func waitResponse(ctx *gin.Context, r *http.Response, sse bool) (content string)
 			break
 		}
 
-		chunk := scanner.Bytes()
+		chunk := event.payload
 		if len(chunk) == 0 {
 			continue
 		}
 
-		if event[7:] == "error" {
+		if event.kind == "error" {
 			if bytes.Equal(chunk, []byte("{}")) {
 				break
 			}
@@ -198,11 +186,11 @@ func waitResponse(ctx *gin.Context, r *http.Response, sse bool) (content string)
 				err = &chunkErr
 			}
 
-			if response.NotSSEHeader(ctx) {
+			if response.NotSSEHeader(ctx) && !ctx.Writer.Written() {
 				logger.Error(err)
 				response.Error(ctx, -1, err)
 			}
-			return
+			return content, err
 		}
 
 		raw := string(chunk)
@@ -260,7 +248,7 @@ func waitResponse(ctx *gin.Context, r *http.Response, sse bool) (content string)
 	}
 
 	if content == "" && response.NotSSEHeader(ctx) {
-		return
+		return content, nil
 	}
 
 	ctx.Set(vars.GinCompletionUsage, response.CalcUsageTokens(content, tokens))
@@ -269,78 +257,5 @@ func waitResponse(ctx *gin.Context, r *http.Response, sse bool) (content string)
 	} else {
 		response.SSEResponse(ctx, Model, "[DONE]", created)
 	}
-	return
-}
-
-func newScanner(body io.ReadCloser) (scanner *bufio.Scanner) {
-	// 每个字节占8位
-	// 00000011 第一个字节是占位符，应该是用来代表消息类型的 假定 1: 消息体/proto+gzip, 3: 错误标记/gzip
-	// 00000000 00000000 00000010 11011000 4个字节描述包体大小
-	scanner = bufio.NewScanner(body)
-	var (
-		magic    byte
-		chunkLen = -1
-		setup    = 5
-	)
-
-	scanner.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
-		if atEOF && len(data) == 0 {
-			return
-		}
-
-		if atEOF {
-			return len(data), data, err
-		}
-
-		if chunkLen == -1 && len(data) < setup {
-			return
-		}
-
-		if chunkLen == -1 {
-			magic = data[0]
-			chunkLen = bytesToInt32(data[1:setup])
-
-			if magic == 3 { // 假定它是错误标记 ?? 有没搞错，error和done同用一个标记？
-				return setup, []byte("event: error"), err
-			}
-
-			// magic == 1
-			return setup, []byte("event: message"), err
-		}
-
-		if len(data) < chunkLen {
-			return
-		}
-
-		chunk := data[:chunkLen]
-		chunkLen = -1
-
-		i := len(chunk)
-		// 解码
-		if emit.IsEncoding(chunk, "gzip") {
-			reader, gzErr := emit.DecodeGZip(io.NopCloser(bytes.NewReader(chunk)))
-			if gzErr != nil {
-				err = gzErr
-				return
-			}
-			chunk, err = io.ReadAll(reader)
-		}
-
-		if magic != 3 {
-			var message ResMessage
-			err = proto.Unmarshal(chunk, &message)
-			if err != nil {
-				return
-			}
-
-			if message.Think != "" {
-				chunk = append([]byte(thinkTag), []byte(message.Think)...)
-			} else {
-				chunk = []byte(message.Message)
-			}
-		}
-		return i, chunk, err
-	})
-
-	return
+	return content, nil
 }

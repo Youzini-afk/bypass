@@ -76,6 +76,21 @@ docker run -p 8080:8080 -v ./config.yaml:/app/config.yaml ghcr.io/bincooo/chatgp
 
 2. huggingface: [Duplicate this Space](https://huggingface.co/spaces/wIK5Ez2o/DEMO/tree/main?duplicate=true)
 
+### Zeabur 自动部署
+项目根目录已提供 `Dockerfile`，Zeabur 导入 GitHub 仓库后会自动识别为 Docker 部署。
+
+```shell
+# 本地验证
+docker build -t chatgpt-adapter .
+docker run -e PORT=8080 -p 8080:8080 chatgpt-adapter
+```
+
+说明：
+
+- 服务会优先读取平台注入的 `PORT` 环境变量，无需手动写死端口。
+- 如果你需要某些依赖浏览器绕盾的 provider，还需要额外配置 `browser-less.reversal` 或相关浏览器服务。
+- 推送到 GitHub 后，Zeabur 连接该仓库即可自动触发构建与重新部署。
+
 ### systemctl 自启动配置
 ```adapter.service
 [Unit]

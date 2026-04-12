@@ -127,6 +127,11 @@ func errorToCode(code int, err interface{}) int {
 
 	if code == -1 {
 		if e, ok := err.(error); ok {
+			if errors.Is(e, UnauthorizedError) {
+				code = http.StatusUnauthorized
+				goto label
+			}
+
 			if errors.As(e, &busErr) {
 				if busErr.Code == http.StatusUnauthorized {
 					code = http.StatusUnauthorized

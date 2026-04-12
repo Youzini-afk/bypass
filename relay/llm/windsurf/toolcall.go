@@ -27,12 +27,12 @@ func toolChoice(ctx *gin.Context, env *env.Environment, cookie string, completio
 			},
 		}
 
-		token, err := genToken(ctx.Request.Context(), env.GetString("server.proxied"), cookie)
+		token, err := genToken(ctx.Request.Context(), env, env.GetString("server.proxied"), cookie)
 		if err != nil {
 			return "", err
 		}
 
-		messageBuffer, err := convertRequest(completion, cookie, token)
+		messageBuffer, err := convertRequest(env, completion, cookie, token)
 		if err != nil {
 			return "", err
 		}

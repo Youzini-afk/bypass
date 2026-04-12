@@ -86,7 +86,11 @@ func (rc *RootCommand) Run(cmd *cobra.Command, args []string) {
 
 func Initialized(rc *RootCommand) {
 	if rc.env.GetInt("server.port") == 0 {
-		rc.env.Set("server.port", rc.Port)
+		if port := os.Getenv("PORT"); port != "" {
+			rc.env.Set("server.port", port)
+		} else {
+			rc.env.Set("server.port", rc.Port)
+		}
 	}
 	if rc.Proxied != "" {
 		rc.env.Set("server.proxied", rc.Proxied)
