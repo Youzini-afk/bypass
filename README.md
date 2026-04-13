@@ -77,7 +77,11 @@ docker run -p 8080:8080 -v ./config.yaml:/app/config.yaml ghcr.io/bincooo/chatgp
 2. huggingface: [Duplicate this Space](https://huggingface.co/spaces/wIK5Ez2o/DEMO/tree/main?duplicate=true)
 
 ### Zeabur 自动部署
-项目根目录已提供 `Dockerfile`，Zeabur 导入 GitHub 仓库后会自动识别为 Docker 部署。
+项目根目录已提供多阶段 `Dockerfile`，Zeabur 导入 GitHub 仓库后会自动识别为 Docker 部署，并在构建阶段自动完成：
+
+- 管理端 WebUI 的 `Vite + React + TypeScript` 构建
+- Go 二进制编译
+- 前端产物嵌入服务端
 
 ```shell
 # 本地验证
@@ -88,6 +92,10 @@ docker run -e PORT=8080 -p 8080:8080 chatgpt-adapter
 说明：
 
 - 服务会优先读取平台注入的 `PORT` 环境变量，无需手动写死端口。
+- 根路径 `/` 现在提供内置管理员 WebUI，健康检查改为 `/healthz`。
+- 建议在 Zeabur 为服务挂载持久化目录到 `/app/data`，用于保存 `runtime-config.json`。
+- `config.yaml` 继续作为 bootstrap 配置来源；WebUI 保存的运行时配置会单独写入 `/app/data/runtime-config.json`。
+- 建议同时配置 `server.password` 或环境变量 `PASSWORD`，作为管理员后台登录密码。
 - 如果你需要某些依赖浏览器绕盾的 provider，还需要额外配置 `browser-less.reversal` 或相关浏览器服务。
 - 推送到 GitHub 后，Zeabur 连接该仓库即可自动触发构建与重新部署。
 

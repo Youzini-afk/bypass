@@ -31,6 +31,10 @@ internal/gin.handler/3rd.go
 cookies.txt
 config.yaml
 package-lock.json
+!core/adminui/frontend/package-lock.json
+*.tsbuildinfo
+core/adminui/frontend/vite.config.js
+core/adminui/frontend/vite.config.d.ts
 CHANGELOG.md
 
 # osx system

@@ -13,12 +13,14 @@ import (
 )
 
 var (
-	debug bool
+	debug  bool
+	ginEnv *env.Environment
 )
 
 // @Inject(lazy="false", name="ginInitializer")
 func Initialized(env *env.Environment) sdk.Initializer {
 	debug = env.GetBool("server.debug")
+	ginEnv = env
 	return sdk.InitializedWrapper(0, func(container *sdk.Container) (err error) {
 		sdk.ProvideTransient(container, sdk.NameOf[*gin.Engine](), func() (engine *gin.Engine, err error) {
 			if !debug {
@@ -36,6 +38,10 @@ func Initialized(env *env.Environment) sdk.Initializer {
 			for _, route := range beans {
 				route.Routers(engine)
 			}
+			admin, adminErr := sdk.InvokeBean[*AdminHandler](container, "")
+			if adminErr == nil && admin != nil {
+				admin.Mount(engine)
+			}
 
 			return
 		})
@@ -49,6 +55,9 @@ func token(gtx *gin.Context) {
 		str = strings.TrimPrefix(gtx.Request.Header.Get("Authorization"), "Bearer ")
 	}
 	gtx.Set("token", str)
+	if ginEnv != nil {
+		gtx.Set("proxies", ginEnv.GetString("server.proxied"))
+	}
 }
 
 func cros(gtx *gin.Context) {
@@ -68,8 +77,11 @@ func cros(gtx *gin.Context) {
 	}
 
 	if gtx.Request.RequestURI == "/" ||
+		gtx.Request.RequestURI == "/healthz" ||
 		gtx.Request.RequestURI == "/favicon.ico" ||
+		strings.HasPrefix(gtx.Request.URL.Path, "/api/admin/") ||
 		strings.Contains(gtx.Request.URL.Path, "/v1/models") ||
+		strings.HasPrefix(gtx.Request.URL.Path, "/assets/") ||
 		strings.HasPrefix(gtx.Request.URL.Path, "/file/") {
 		// 处理请求
 		gtx.Next()
@@ -80,11 +92,29 @@ func cros(gtx *gin.Context) {
 	// 请求打印
 	data, _ := httputil.DumpRequest(gtx.Request, debug)
 	logger.Infof("------ START REQUEST %s ---------", uid)
-	println(string(data))
+	println(redactRequestDump(string(data)))
 
 	// 处理请求
 	gtx.Next()
 
 	// 结束处理
 	logger.Infof("------ END REQUEST %s ---------", uid)
+}
+
+func redactRequestDump(raw string) string {
+	lines := strings.Split(raw, "\r\n")
+	for idx, line := range lines {
+		lower := strings.ToLower(line)
+		switch {
+		case strings.HasPrefix(lower, "authorization:"),
+			strings.HasPrefix(lower, "x-api-key:"),
+			strings.HasPrefix(lower, "cookie:"),
+			strings.HasPrefix(lower, "proxy-authorization:"):
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) == 2 {
+				lines[idx] = parts[0] + ": [REDACTED]"
+			}
+		}
+	}
+	return strings.Join(lines, "\r\n")
 }

@@ -7,6 +7,7 @@ import (
 	"chatgpt-adapter/core/gin/model"
 	"chatgpt-adapter/core/gin/response"
 	"chatgpt-adapter/core/logger"
+	"chatgpt-adapter/core/runtimecfg"
 	"github.com/gin-gonic/gin"
 	"github.com/iocgo/sdk/env"
 	"strings"
@@ -23,6 +24,9 @@ type api struct {
 }
 
 func (api *api) Match(ctx *gin.Context, model string) (ok bool, err error) {
+	if !runtimecfg.Enabled(Model) {
+		return
+	}
 	if len(model) <= 9 || Model+"/" != model[:9] {
 		return
 	}
@@ -41,6 +45,9 @@ func (api *api) Match(ctx *gin.Context, model string) (ok bool, err error) {
 }
 
 func (api *api) Models() (slice []model.Model) {
+	if !runtimecfg.Enabled(Model) {
+		return nil
+	}
 	for _, mod := range listModelNames(api.env) {
 		slice = append(slice, model.Model{
 			Id:      Model + "/" + mod,

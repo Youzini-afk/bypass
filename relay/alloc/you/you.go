@@ -13,6 +13,7 @@ import (
 	"chatgpt-adapter/core/common/vars"
 	"chatgpt-adapter/core/gin/response"
 	"chatgpt-adapter/core/logger"
+	"chatgpt-adapter/core/runtimecfg"
 	"github.com/bincooo/emit.io"
 	"github.com/bincooo/you.com"
 	"github.com/gin-gonic/gin"
@@ -25,6 +26,8 @@ const iCookie = "_ga_2N7ZM9C56V=GS1.1.1734870573.1.0.1734870585.0.0.1930923381; 
 var (
 	mu sync.Mutex
 
+	timerOnce sync.Once
+
 	lang      = "cn-ZN,cn;q=0.9"
 	clearance = ""
 	userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0"
@@ -33,14 +36,24 @@ var (
 )
 
 func init() {
+	runtimecfg.RegisterReloader("you", Reload)
 	inited.AddInitialized(func(env *env.Environment) {
-		cookies := env.GetStringSlice("you.cookies")
-		cookiesContainer = common.NewPollContainer[string]("you", cookies, 6*time.Hour)
-		cookiesContainer.Condition = condition(env)
-		if len(cookies) > 0 && env.GetBool("you.task") {
-			go timer(env)
+		if err := Reload(env); err != nil {
+			panic(err)
 		}
 	})
+}
+
+func Reload(env *env.Environment) error {
+	cookies := env.GetStringSlice("you.cookies")
+	cookiesContainer = common.NewPollContainer[string]("you", cookies, 6*time.Hour)
+	cookiesContainer.Condition = condition(env)
+	if len(cookies) > 0 && env.GetBool("you.task") {
+		timerOnce.Do(func() {
+			go timer(env)
+		})
+	}
+	return nil
 }
 
 func timer(env *env.Environment) {

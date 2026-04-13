@@ -12,6 +12,7 @@ import (
 	"chatgpt-adapter/core/gin/model"
 	"chatgpt-adapter/core/gin/response"
 	"chatgpt-adapter/core/logger"
+	"chatgpt-adapter/core/runtimecfg"
 	"github.com/bincooo/coze-api"
 	"github.com/gin-gonic/gin"
 	"github.com/iocgo/sdk/env"
@@ -29,6 +30,9 @@ type api struct {
 }
 
 func (api *api) Match(ctx *gin.Context, model string) (ok bool, err error) {
+	if !runtimecfg.Enabled(Model) {
+		return
+	}
 	if Model == model {
 		ok = true
 		return
@@ -67,6 +71,9 @@ func (api *api) Match(ctx *gin.Context, model string) (ok bool, err error) {
 }
 
 func (*api) Models() []model.Model {
+	if !runtimecfg.Enabled(Model) {
+		return nil
+	}
 	return []model.Model{
 		{
 			Id:      Model,

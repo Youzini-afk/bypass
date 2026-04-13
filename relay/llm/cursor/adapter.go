@@ -6,6 +6,7 @@ import (
 	"chatgpt-adapter/core/gin/model"
 	"chatgpt-adapter/core/gin/response"
 	"chatgpt-adapter/core/logger"
+	"chatgpt-adapter/core/runtimecfg"
 	"github.com/gin-gonic/gin"
 	"github.com/iocgo/sdk/env"
 	"net/url"
@@ -23,6 +24,9 @@ type api struct {
 }
 
 func (api *api) Match(ctx *gin.Context, model string) (ok bool, err error) {
+	if !runtimecfg.Enabled(Model) {
+		return
+	}
 	if len(model) <= 7 || Model+"/" != model[:7] {
 		return
 	}
@@ -66,6 +70,9 @@ func (api *api) Match(ctx *gin.Context, model string) (ok bool, err error) {
 }
 
 func (api *api) Models() (slice []model.Model) {
+	if !runtimecfg.Enabled(Model) {
+		return nil
+	}
 	for _, mod := range append(api.env.GetStringSlice("cursor.model"), []string{
 		"claude-3.5-sonnet",
 		"gpt-4",

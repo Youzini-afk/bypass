@@ -9,6 +9,7 @@ import (
 	"chatgpt-adapter/core/gin/model"
 	"chatgpt-adapter/core/gin/response"
 	"chatgpt-adapter/core/logger"
+	"chatgpt-adapter/core/runtimecfg"
 	"github.com/bincooo/you.com"
 	"github.com/gin-gonic/gin"
 	"github.com/iocgo/sdk/env"
@@ -25,6 +26,9 @@ type api struct {
 }
 
 func (api *api) Match(ctx *gin.Context, model string) (ok bool, err error) {
+	if !runtimecfg.Enabled(Model) {
+		return
+	}
 	token := ctx.GetString("token")
 	if !strings.HasPrefix(model, "you/") {
 		return
@@ -61,6 +65,9 @@ func (api *api) Match(ctx *gin.Context, model string) (ok bool, err error) {
 }
 
 func (api *api) Models() (slice []model.Model) {
+	if !runtimecfg.Enabled(Model) {
+		return nil
+	}
 	s := api.env.GetStringSlice("you.model")
 	for _, mod := range append(s, []string{
 		you.GPT_4,

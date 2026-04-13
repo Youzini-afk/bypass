@@ -1,3 +1,13 @@
+FROM node:22-alpine AS admin-ui
+
+WORKDIR /src/core/adminui/frontend
+
+COPY core/adminui/frontend/package.json core/adminui/frontend/package-lock.json ./
+RUN npm ci
+
+COPY core/adminui/frontend ./
+RUN npm run build
+
 FROM golang:1.23-alpine AS builder
 
 WORKDIR /src
@@ -8,6 +18,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
+COPY --from=admin-ui /src/core/adminui/dist ./core/adminui/dist
 
 RUN go install -ldflags="-s -w" -trimpath ./cmd/iocgo
 RUN CGO_ENABLED=0 go build -toolexec /go/bin/iocgo -ldflags="-s -w" -trimpath -o /out/server ./main.go
@@ -18,7 +29,7 @@ FROM alpine:3.20
 WORKDIR /app
 
 RUN apk add --no-cache ca-certificates tzdata \
-    && mkdir -p /app/log /app/tmp /app/relay/llm/deepseek
+    && mkdir -p /app/log /app/tmp /app/data /app/relay/llm/deepseek
 
 COPY --from=builder /out/server ./server
 COPY --from=builder /out/config.yaml ./config.yaml

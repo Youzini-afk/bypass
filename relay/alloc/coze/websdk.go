@@ -20,6 +20,7 @@ type obj struct {
 
 var (
 	w_mu          sync.Mutex
+	loopOnce      sync.Once
 	taskContainer = make([]*obj, 0)
 
 	w_init  = true

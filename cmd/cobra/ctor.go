@@ -4,6 +4,7 @@ import (
 	"chatgpt-adapter/core/common/inited"
 	"chatgpt-adapter/core/gin/inter"
 	"chatgpt-adapter/core/logger"
+	"chatgpt-adapter/core/runtimecfg"
 	"github.com/gin-gonic/gin"
 	"github.com/iocgo/sdk"
 	"github.com/iocgo/sdk/cobra"
@@ -106,6 +107,9 @@ func Initialized(rc *RootCommand) {
 	}
 
 	initFile(rc.env)
+	if err := runtimecfg.Init(rc.env); err != nil {
+		logger.Fatal(err)
+	}
 }
 
 func LogLevel(lv string) logrus.Level {

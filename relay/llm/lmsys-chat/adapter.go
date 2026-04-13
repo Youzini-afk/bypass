@@ -6,6 +6,7 @@ import (
 	"chatgpt-adapter/core/gin/model"
 	"chatgpt-adapter/core/gin/response"
 	"chatgpt-adapter/core/logger"
+	"chatgpt-adapter/core/runtimecfg"
 	"github.com/gin-gonic/gin"
 	"github.com/iocgo/sdk/env"
 	"golang.org/x/exp/maps"
@@ -29,6 +30,9 @@ type api struct {
 }
 
 func (api *api) Match(ctx *gin.Context, model string) (ok bool, err error) {
+	if !runtimecfg.Enabled("lmsys") {
+		return
+	}
 	token := ctx.GetString("token")
 	if len(model) <= 11 || model[:11] != Model+"/" {
 		return
@@ -54,6 +58,9 @@ func (api *api) Match(ctx *gin.Context, model string) (ok bool, err error) {
 }
 
 func (api *api) Models() (result []model.Model) {
+	if !runtimecfg.Enabled("lmsys") {
+		return nil
+	}
 	customMap := api.env.GetStringMapString("lmsys-chat.model")
 	slice := maps.Keys(customMap)
 	modelSlice := maps.Keys(modelMap)

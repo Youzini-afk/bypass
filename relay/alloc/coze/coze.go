@@ -13,6 +13,7 @@ import (
 	"chatgpt-adapter/core/gin/model"
 	"chatgpt-adapter/core/gin/response"
 	"chatgpt-adapter/core/logger"
+	"chatgpt-adapter/core/runtimecfg"
 	"github.com/bincooo/coze-api"
 	"github.com/bincooo/emit.io"
 	"github.com/gin-gonic/gin"
@@ -33,24 +34,48 @@ var (
 )
 
 func init() {
+	runtimecfg.RegisterReloader("coze", Reload)
 	inited.AddInitialized(func(env *env.Environment) {
-		var values []*account
-		err := env.UnmarshalKey("coze.websdk.accounts", &values)
-		if err != nil {
+		if err := Reload(env); err != nil {
 			panic(err)
 		}
-		if len(values) == 0 {
-			return
-		}
-
-		if !env.GetBool("browser-less.enabled") && env.GetString("browser-less.reversal") == "" {
-			panic("don't used browser-less, please setting `browser-less.enabled` or `browser-less.reversal`")
-		}
-
-		cookiesContainer = common.NewPollContainer("coze", make([]*account, 0), 60*time.Second) // 报错进入60秒冷却
-		cookiesContainer.Condition = condition(env.GetString("server.proxied"))
-		run(env, values...)
 	})
+}
+
+func Reload(env *env.Environment) error {
+	var values []*account
+	if err := env.UnmarshalKey("coze.websdk.accounts", &values); err != nil {
+		return err
+	}
+
+	cookiesContainer = common.NewPollContainer("coze", make([]*account, 0), 60*time.Second)
+	cookiesContainer.Condition = condition(env.GetString("server.proxied"))
+
+	w_mu.Lock()
+	taskContainer = make([]*obj, 0)
+	w_mu.Unlock()
+	w_init = true
+	bot = ""
+
+	if len(values) == 0 {
+		w_init = false
+		return nil
+	}
+
+	if !env.GetBool("browser-less.enabled") && env.GetString("browser-less.reversal") == "" {
+		return errors.New("don't used browser-less, please setting `browser-less.enabled` or `browser-less.reversal`")
+	}
+
+	loopOnce.Do(func() {
+		go loop(env)
+	})
+
+	objs := make([]*obj, 0, len(values))
+	for _, value := range values {
+		objs = append(objs, &obj{value: value, count: w_retry})
+	}
+	go runTasks(env, objs...)
+	return nil
 }
 
 func InvocationHandler(ctx *proxy.Context) {

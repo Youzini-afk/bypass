@@ -12,6 +12,7 @@ import (
 	"chatgpt-adapter/core/common/vars"
 	"chatgpt-adapter/core/gin/response"
 	"chatgpt-adapter/core/logger"
+	"chatgpt-adapter/core/runtimecfg"
 	"github.com/bincooo/emit.io"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -29,11 +30,19 @@ var (
 )
 
 func init() {
+	runtimecfg.RegisterReloader("grok", Reload)
 	inited.AddInitialized(func(env *env.Environment) {
-		cookies := env.GetStringSlice("grok.cookies")
-		cookiesContainer = common.NewPollContainer[string]("grok", cookies, time.Hour)
-		cookiesContainer.Condition = condition
+		if err := Reload(env); err != nil {
+			panic(err)
+		}
 	})
+}
+
+func Reload(env *env.Environment) error {
+	cookies := env.GetStringSlice("grok.cookies")
+	cookiesContainer = common.NewPollContainer[string]("grok", cookies, time.Hour)
+	cookiesContainer.Condition = condition
+	return nil
 }
 
 func InvocationHandler(ctx *proxy.Context) {

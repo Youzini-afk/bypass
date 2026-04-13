@@ -24,7 +24,7 @@ func New(container *sdk.Container) *Handler {
 	return &Handler{extensions}
 }
 
-// @GET(path = "/")
+// @GET(path = "/healthz")
 func (h *Handler) index(gtx *gin.Context) {
 	gtx.Writer.WriteString("<div style='color:green'>success ~</div>")
 }

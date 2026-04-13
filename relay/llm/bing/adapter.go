@@ -15,6 +15,7 @@ import (
 	"chatgpt-adapter/core/gin/inter"
 	"chatgpt-adapter/core/gin/model"
 	"chatgpt-adapter/core/gin/response"
+	"chatgpt-adapter/core/runtimecfg"
 	"github.com/bincooo/edge-api"
 	"github.com/bincooo/emit.io"
 	"github.com/gin-gonic/gin"
@@ -34,6 +35,9 @@ type api struct {
 }
 
 func (api *api) Match(ctx *gin.Context, model string) (ok bool, err error) {
+	if !runtimecfg.Enabled(Model) {
+		return
+	}
 	var token = ctx.GetString("token")
 	ok = Model == model || model == Model+"-reason"
 	if ok {
@@ -47,6 +51,9 @@ func (api *api) Match(ctx *gin.Context, model string) (ok bool, err error) {
 }
 
 func (*api) Models() (slice []model.Model) {
+	if !runtimecfg.Enabled(Model) {
+		return nil
+	}
 	slice = append(slice, model.Model{
 		Id:      Model,
 		Object:  "model",

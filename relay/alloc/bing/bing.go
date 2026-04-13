@@ -8,6 +8,7 @@ import (
 	"chatgpt-adapter/core/common/vars"
 	"chatgpt-adapter/core/gin/response"
 	"chatgpt-adapter/core/logger"
+	"chatgpt-adapter/core/runtimecfg"
 	"github.com/gin-gonic/gin"
 	"github.com/iocgo/sdk/env"
 	"github.com/iocgo/sdk/proxy"
@@ -19,26 +20,38 @@ var (
 )
 
 func init() {
+	runtimecfg.RegisterReloader("bing", Reload)
 	inited.AddInitialized(func(env *env.Environment) {
-		cookies, ok := env.Get("bing.cookies").([]interface{})
-		if !ok {
-			return
+		if err := Reload(env); err != nil {
+			panic(err)
 		}
-		slice := stream.Map(stream.OfSlice(cookies), func(t interface{}) (obj map[string]string) {
-			m, o := t.(map[string]interface{})
-			if !o {
-				return
-			}
-			return map[string]string{
-				"scopeId": m["scopeid"].(string),
-				"idToken": m["idtoken"].(string),
-				"cookie":  m["cookie"].(string),
-			}
-		}).ToSlice()
-
-		cookiesContainer = common.NewPollContainer[map[string]string]("bing", slice, 6*time.Hour)
-		cookiesContainer.Condition = condition
 	})
+}
+
+func Reload(env *env.Environment) error {
+	var cookies []struct {
+		ScopeID string `mapstructure:"scopeid"`
+		IDToken string `mapstructure:"idtoken"`
+		Cookie  string `mapstructure:"cookie"`
+	}
+	if err := env.UnmarshalKey("bing.cookies", &cookies); err != nil {
+		return err
+	}
+	slice := stream.Map(stream.OfSlice(cookies), func(t struct {
+		ScopeID string `mapstructure:"scopeid"`
+		IDToken string `mapstructure:"idtoken"`
+		Cookie  string `mapstructure:"cookie"`
+	}) (obj map[string]string) {
+		return map[string]string{
+			"scopeId": t.ScopeID,
+			"idToken": t.IDToken,
+			"cookie":  t.Cookie,
+		}
+	}).ToSlice()
+
+	cookiesContainer = common.NewPollContainer[map[string]string]("bing", slice, 6*time.Hour)
+	cookiesContainer.Condition = condition
+	return nil
 }
 
 func InvocationHandler(ctx *proxy.Context) {
