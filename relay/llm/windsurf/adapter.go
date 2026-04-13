@@ -8,6 +8,7 @@ import (
 	"chatgpt-adapter/core/gin/response"
 	"chatgpt-adapter/core/logger"
 	"chatgpt-adapter/core/runtimecfg"
+	"chatgpt-adapter/core/windsurfmeta"
 	"github.com/gin-gonic/gin"
 	"github.com/iocgo/sdk/env"
 	"strings"
@@ -30,16 +31,15 @@ func (api *api) Match(ctx *gin.Context, model string) (ok bool, err error) {
 	if len(model) <= 9 || Model+"/" != model[:9] {
 		return
 	}
-	for _, mod := range listModelNames(api.env) {
-		if model[9:] == mod {
-			if strings.HasPrefix(mod, "deepseek") {
-				completion := common.GetGinCompletion(ctx)
-				completion.StopSequences = append(completion.StopSequences, "<codebase_search>", "<write_to_file>", "<open_link>")
-				ctx.Set(vars.GinCompletion, completion)
-			}
-			ok = true
-			return
+
+	modelName := windsurfmeta.CanonicalName(model[9:])
+	if _, err = resolveModelID(api.env, modelName); err == nil {
+		if strings.HasPrefix(modelName, "deepseek") {
+			completion := common.GetGinCompletion(ctx)
+			completion.StopSequences = append(completion.StopSequences, "<codebase_search>", "<write_to_file>", "<open_link>")
+			ctx.Set(vars.GinCompletion, completion)
 		}
+		ok = true
 	}
 	return
 }

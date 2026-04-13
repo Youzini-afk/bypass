@@ -9,24 +9,38 @@ import (
 
 	"chatgpt-adapter/core/gin/model"
 	"chatgpt-adapter/core/gin/response"
+	"chatgpt-adapter/core/windsurfmeta"
 	"github.com/golang/protobuf/proto"
 )
 
 func TestMergeModelRegistryAppliesCustomOverrides(t *testing.T) {
 	registry := mergeModelRegistry(map[string]string{
-		"new-model": "999",
-		"gpt4o":     "110",
-		"broken":    "abc",
+		"new-model":         "999",
+		"gpt4o":             "110",
+		"claude-3-7-sonnet": "226",
+		"broken":            "abc",
 	})
 
 	if got := registry["new-model"]; got != 999 {
 		t.Fatalf("expected custom model id 999, got %d", got)
 	}
-	if got := registry["gpt4o"]; got != 110 {
-		t.Fatalf("expected override model id 110, got %d", got)
+	if got := registry["gpt-4o"]; got != 110 {
+		t.Fatalf("expected canonical override model id 110, got %d", got)
+	}
+	if _, ok := registry["gpt4o"]; ok {
+		t.Fatalf("legacy alias should not be listed in registry")
 	}
 	if _, ok := registry["broken"]; ok {
 		t.Fatalf("invalid model mapping should be ignored")
+	}
+}
+
+func TestResolveModelIDSupportsLegacyAlias(t *testing.T) {
+	if got, err := resolveModelID(nil, "gpt4o"); err != nil || got != 109 {
+		t.Fatalf("expected legacy alias to resolve to builtin id 109, got %d err=%v", got, err)
+	}
+	if got, err := resolveModelID(nil, windsurfmeta.CanonicalName("claude-3-7-sonnet-think")); err != nil || got != 227 {
+		t.Fatalf("expected canonical thinking alias to resolve to builtin id 227, got %d err=%v", got, err)
 	}
 }
 

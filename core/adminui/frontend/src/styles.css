@@ -311,7 +311,8 @@ code,
 .summary-card,
 .panel,
 .provider-card,
-.editor-card {
+.editor-card,
+.official-model-card {
   padding: 24px;
 }
 
@@ -338,6 +339,40 @@ code,
   background: rgba(17, 106, 99, 0.1);
   color: #125750;
   font-size: 12px;
+}
+
+.official-model-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.official-model-card {
+  display: grid;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+
+.official-model-card__top,
+.official-model-card__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.official-model-card__meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.official-model-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 .chip {

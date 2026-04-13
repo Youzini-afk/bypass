@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"chatgpt-adapter/core/windsurfmeta"
 	"github.com/google/uuid"
 	"github.com/iocgo/sdk/env"
 )
@@ -21,17 +22,6 @@ const (
 )
 
 var (
-	defaultWindsurfModels = map[string]string{
-		"gpt4o":                   "109",
-		"claude-3-5-sonnet":       "166",
-		"gemini-2.0-flash":        "184",
-		"deepseek-chat":           "205",
-		"deepseek-reasoner":       "206",
-		"gpt4-o3-mini":            "207",
-		"claude-3-7-sonnet":       "226",
-		"claude-3-7-sonnet-think": "227",
-	}
-
 	manager   *Manager
 	managerMu sync.RWMutex
 	initOnce  sync.Once
@@ -410,7 +400,7 @@ func normalizeConfig(cfg RuntimeConfig) RuntimeConfig {
 	cfg.Server.Proxied = strings.TrimSpace(cfg.Server.Proxied)
 
 	cfg.Windsurf.Accounts = normalizeSecretAccounts(cfg.Windsurf.Accounts)
-	cfg.Windsurf.Models = normalizeNamedValues(cfg.Windsurf.Models)
+	cfg.Windsurf.Models = normalizeWindsurfNamedValues(cfg.Windsurf.Models)
 	cfg.Windsurf.Profile = normalizeWindsurfProfile(cfg.Windsurf.Profile)
 
 	cfg.Providers.Cursor = normalizeProvider(cfg.Providers.Cursor)
@@ -455,6 +445,24 @@ func normalizeWindsurfProfile(profile WindsurfProfile) WindsurfProfile {
 	profile.Instructions = strings.TrimSpace(profile.Instructions)
 	profile.InstructionsSuffix = strings.TrimSpace(profile.InstructionsSuffix)
 	return profile
+}
+
+func normalizeWindsurfNamedValues(values []NamedValue) []NamedValue {
+	merged := make(map[string]string, len(values))
+	for _, item := range values {
+		name := windsurfmeta.CanonicalName(item.Name)
+		value := strings.TrimSpace(item.Value)
+		if name == "" || value == "" {
+			continue
+		}
+		merged[name] = value
+	}
+
+	result := make([]NamedValue, 0, len(merged))
+	for name, value := range merged {
+		result = append(result, NamedValue{Name: name, Value: value})
+	}
+	return normalizeNamedValues(result)
 }
 
 func normalizeSecretAccounts(accounts []SecretAccount) []SecretAccount {
@@ -841,19 +849,7 @@ func statStorage(path string) StorageStatus {
 }
 
 func mergeDefaultWindsurfModels(custom map[string]string) map[string]string {
-	result := make(map[string]string, len(defaultWindsurfModels)+len(custom))
-	for key, value := range defaultWindsurfModels {
-		result[key] = value
-	}
-	for key, value := range custom {
-		key = strings.TrimSpace(key)
-		value = strings.TrimSpace(value)
-		if key == "" || value == "" {
-			continue
-		}
-		result[key] = value
-	}
-	return result
+	return windsurfmeta.NormalizeRegistry(custom)
 }
 
 func mapToNamedValues(values map[string]string) []NamedValue {
@@ -867,7 +863,7 @@ func mapToNamedValues(values map[string]string) []NamedValue {
 func namedValuesToMap(values []NamedValue) map[string]string {
 	result := make(map[string]string, len(values))
 	for _, item := range values {
-		name := strings.TrimSpace(item.Name)
+		name := windsurfmeta.CanonicalName(item.Name)
 		value := strings.TrimSpace(item.Value)
 		if name == "" || value == "" {
 			continue

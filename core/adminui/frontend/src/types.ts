@@ -126,12 +126,22 @@ export type ProviderSummary = {
   models: string[];
 };
 
+export type WindsurfOfficialModel = {
+  name: string;
+  availability: string;
+  source: string;
+  sourceDate: string;
+  note?: string;
+  builtinMapping: boolean;
+};
+
 export type BootstrapResponse = {
   ok: boolean;
   authenticated: boolean;
   requiresLogin: boolean;
   storage: StorageStatus;
   providers: ProviderSummary[];
+  windsurfCatalog: WindsurfOfficialModel[];
   version: string;
 };
 

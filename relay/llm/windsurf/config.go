@@ -9,6 +9,7 @@ import (
 	"chatgpt-adapter/core/gin/model"
 	"chatgpt-adapter/core/gin/response"
 	"chatgpt-adapter/core/logger"
+	"chatgpt-adapter/core/windsurfmeta"
 	"github.com/iocgo/sdk/env"
 )
 
@@ -22,17 +23,6 @@ type clientProfile struct {
 	Equi         string
 	UserAgent    string
 	Instructions string
-}
-
-var defaultModelRegistry = map[string]uint32{
-	"gpt4o":                   109,
-	"claude-3-5-sonnet":       166,
-	"gemini-2.0-flash":        184,
-	"deepseek-chat":           205,
-	"deepseek-reasoner":       206,
-	"gpt4-o3-mini":            207,
-	"claude-3-7-sonnet":       226,
-	"claude-3-7-sonnet-think": 227,
 }
 
 const (
@@ -97,13 +87,18 @@ func loadProfile(environment *env.Environment) clientProfile {
 }
 
 func mergeModelRegistry(custom map[string]string) map[string]uint32 {
-	registry := make(map[string]uint32, len(defaultModelRegistry)+len(custom))
-	for name, id := range defaultModelRegistry {
-		registry[name] = id
+	defaults := windsurfmeta.DefaultRegistry()
+	registry := make(map[string]uint32, len(defaults)+len(custom))
+	for name, rawID := range defaults {
+		id, err := strconv.ParseUint(rawID, 10, 32)
+		if err != nil {
+			logger.Errorf("invalid builtin windsurf model mapping %q=%q: %v", name, rawID, err)
+			continue
+		}
+		registry[name] = uint32(id)
 	}
 
-	for name, rawID := range custom {
-		name = strings.TrimSpace(name)
+	for name, rawID := range windsurfmeta.NormalizeNameValueMap(custom) {
 		rawID = strings.TrimSpace(rawID)
 		if name == "" || rawID == "" {
 			continue
@@ -139,6 +134,7 @@ func listModelNames(environment *env.Environment) []string {
 
 func resolveModelID(environment *env.Environment, modelName string) (uint32, error) {
 	registry := loadModelMap(environment)
+	modelName = windsurfmeta.CanonicalName(modelName)
 	value, ok := registry[modelName]
 	if !ok {
 		return 0, fmt.Errorf("windsurf model '%s' is not configured; set windsurf.model.%s=<numeric_id>", modelName, modelName)

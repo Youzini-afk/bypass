@@ -15,6 +15,7 @@ import (
 	"chatgpt-adapter/core/common"
 	"chatgpt-adapter/core/gin/inter"
 	"chatgpt-adapter/core/runtimecfg"
+	"chatgpt-adapter/core/windsurfmeta"
 	windsurfadmin "chatgpt-adapter/relay/llm/windsurf"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -137,12 +138,13 @@ func (h *AdminHandler) authenticated(ctx *gin.Context) (bool, error) {
 func (h *AdminHandler) bootstrap(ctx *gin.Context) {
 	authenticated, _ := h.authenticated(ctx)
 	ctx.JSON(http.StatusOK, gin.H{
-		"ok":            true,
-		"authenticated": authenticated,
-		"requiresLogin": h.adminPassword() != "",
-		"storage":       runtimecfg.Storage(),
-		"providers":     h.providerSummaries(),
-		"version":       "admin-v1",
+		"ok":              true,
+		"authenticated":   authenticated,
+		"requiresLogin":   h.adminPassword() != "",
+		"storage":         runtimecfg.Storage(),
+		"providers":       h.providerSummaries(),
+		"windsurfCatalog": windsurfmeta.OfficialCatalog(),
+		"version":         "admin-v1",
 	})
 }
 

@@ -9,6 +9,7 @@ import {
   RuntimeConfig,
   SecretAccount,
   StorageStatus,
+  WindsurfOfficialModel,
 } from "./types";
 
 type TabKey = "overview" | "providers" | "windsurf" | "playground";
@@ -89,6 +90,23 @@ function accountHint(hasSecret?: boolean, suffix?: string) {
     return "未保存密钥。";
   }
   return suffix ? `已保存，后四位 ${suffix}，留空则保持。` : "已保存，留空则保持。";
+}
+
+function windsurfCatalogStatusLabel(item: WindsurfOfficialModel, configured: boolean) {
+  if (configured) {
+    return "已配置";
+  }
+  if (item.builtinMapping) {
+    return "内置可用";
+  }
+  return "待补 ID";
+}
+
+function windsurfCatalogStatusClass(item: WindsurfOfficialModel, configured: boolean) {
+  if (configured || item.builtinMapping) {
+    return "status-badge status-badge--ok";
+  }
+  return "status-badge status-badge--warn";
 }
 
 function findDefaultAccount(accounts: Array<{ id: string; default: boolean }>) {
@@ -698,6 +716,15 @@ export default function App() {
       const next = clone(current);
       mutator(next);
       return next;
+    });
+  }
+
+  function ensureWindsurfModel(name: string) {
+    mutateDraft((current) => {
+      if (current.windsurf.models.some((item) => item.name === name)) {
+        return;
+      }
+      current.windsurf.models.push({ name, value: "" });
     });
   }
 
@@ -1315,6 +1342,8 @@ export default function App() {
 
     const windsurf = draft.windsurf;
     const mappedModels = providerModels(models, "windsurf");
+    const configuredModelNames = new Set(windsurf.models.map((item) => item.name));
+    const officialCatalog = bootstrap?.windsurfCatalog || [];
 
     return (
       <div className="stack-page">
@@ -1383,13 +1412,13 @@ export default function App() {
         </div>
 
         <div className="provider-card">
-          <SectionTitle title="模型映射" description="修改后保存即可影响 Windsurf 模型列表和 `/v1/models` 输出。" />
+          <SectionTitle title="模型映射" description="修改后保存即可影响 Windsurf 模型列表和 `/v1/models` 输出。仓库里的旧别名会自动归一化成更接近官方的模型名。" />
           <div className="stack-list">
             {windsurf.models.map((item, index) => (
               <div key={`${item.name}-${index}`} className="mapping-row">
                 <input
                   value={item.name}
-                  placeholder="模型名，例如 claude-3-7-sonnet"
+                  placeholder="模型名，例如 claude-3.7-sonnet"
                   onChange={(event) => mutateDraft((current) => { current.windsurf.models[index].name = event.target.value; })}
                 />
                 <input
@@ -1416,6 +1445,39 @@ export default function App() {
             {mappedModels.slice(0, 8).map((model) => (
               <code key={model}>{model}</code>
             ))}
+          </div>
+        </div>
+
+        <div className="provider-card">
+          <SectionTitle
+            title="官方当前模型目录"
+            description="按 Windsurf 官方 docs 与 changelog 整理到 2026-03。官方公开资料没有暴露内部 numeric id，所以标成“待补 ID”的模型需要你手动补映射后才能在这个逆向适配层里直接调用。"
+          />
+          <div className="official-model-grid">
+            {officialCatalog.map((item) => {
+              const configured = configuredModelNames.has(item.name);
+              return (
+                <div key={item.name} className="official-model-card">
+                  <div className="official-model-card__top">
+                    <strong>{item.name}</strong>
+                    <span className={windsurfCatalogStatusClass(item, configured)}>
+                      {windsurfCatalogStatusLabel(item, configured)}
+                    </span>
+                  </div>
+                  <div className="official-model-card__meta">
+                    <span>{item.availability === "native" ? "官方模型" : "BYOK"}</span>
+                    <span>{item.sourceDate}</span>
+                    <span>{item.source}</span>
+                  </div>
+                  <p>{item.note || "来自 Windsurf 官方变更记录。"}</p>
+                  {!configured && !item.builtinMapping ? (
+                    <button type="button" className="ghost-button" onClick={() => ensureWindsurfModel(item.name)}>
+                      添加待补映射
+                    </button>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         </div>
 
