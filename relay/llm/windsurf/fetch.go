@@ -17,7 +17,6 @@ import (
 	"chatgpt-adapter/core/cache"
 	"chatgpt-adapter/core/common"
 	"chatgpt-adapter/core/gin/model"
-	"chatgpt-adapter/core/gin/response"
 	"chatgpt-adapter/core/logger"
 	"github.com/bincooo/emit.io"
 	"github.com/golang/protobuf/proto"
