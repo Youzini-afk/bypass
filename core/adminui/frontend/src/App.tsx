@@ -1552,9 +1552,9 @@ export default function App() {
         <div className="login-card">
           <div className="section-title__eyebrow">Bypass Admin</div>
           <h1>管理员登录</h1>
-          <p>默认复用 `server.password` 作为后台登录密码。</p>
+          <p>优先使用 `server.password`；如果配置里写的是环境变量占位符，会自动回退到 `PASSWORD`。</p>
           <form onSubmit={handleLogin} className="login-form">
-            <Field label="管理员密码" type="password" value={loginPassword} onChange={setLoginPassword} placeholder="输入 server.password" />
+            <Field label="管理员密码" type="password" value={loginPassword} onChange={setLoginPassword} placeholder="输入 server.password 或 PASSWORD" />
             <button type="submit" className="primary-button" disabled={loginPending}>
               {loginPending ? "登录中..." : "进入控制台"}
             </button>

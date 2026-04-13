@@ -41,7 +41,7 @@ func (api *api) Match(ctx *gin.Context, model string) (ok bool, err error) {
 	var token = ctx.GetString("token")
 	ok = Model == model || model == Model+"-reason"
 	if ok {
-		password := api.env.GetString("server.password")
+		password := common.ResolveServerPassword(api.env)
 		if password != "" && password != token {
 			err = response.UnauthorizedError
 			return

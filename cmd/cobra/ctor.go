@@ -1,6 +1,7 @@
 package cobra
 
 import (
+	"chatgpt-adapter/core/common"
 	"chatgpt-adapter/core/common/inited"
 	"chatgpt-adapter/core/gin/inter"
 	"chatgpt-adapter/core/logger"
@@ -97,13 +98,9 @@ func Initialized(rc *RootCommand) {
 		rc.env.Set("server.proxied", rc.Proxied)
 	}
 
-	if rc.env.GetString("server.password") == "" {
-		for _, item := range os.Environ() {
-			if len(item) > 9 && item[:9] == "PASSWORD=" {
-				rc.env.Set("server.password", item[9:])
-				break
-			}
-		}
+	password := common.ResolveServerPassword(rc.env)
+	if password != strings.TrimSpace(rc.env.GetString("server.password")) {
+		rc.env.Set("server.password", password)
 	}
 
 	initFile(rc.env)

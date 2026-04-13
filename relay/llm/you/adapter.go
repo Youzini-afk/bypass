@@ -52,7 +52,7 @@ func (api *api) Match(ctx *gin.Context, model string) (ok bool, err error) {
 		you.GEMINI_1_5_FLASH,
 	}...) {
 		if model[4:] == mod {
-			password := api.env.GetString("server.password")
+			password := common.ResolveServerPassword(api.env)
 			if password != "" && password != token {
 				err = response.UnauthorizedError
 				return

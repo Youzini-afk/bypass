@@ -40,7 +40,7 @@ func (api *api) Match(ctx *gin.Context, model string) (ok bool, err error) {
 
 	var token = ctx.GetString("token")
 	if model == "coze/websdk" {
-		password := api.env.GetString("server.password")
+		password := common.ResolveServerPassword(api.env)
 		if password != "" && password != token {
 			err = response.UnauthorizedError
 			return

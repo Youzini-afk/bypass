@@ -7,12 +7,12 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"sort"
 	"strings"
 	"time"
 
 	"chatgpt-adapter/core/adminui"
+	"chatgpt-adapter/core/common"
 	"chatgpt-adapter/core/gin/inter"
 	"chatgpt-adapter/core/runtimecfg"
 	windsurfadmin "chatgpt-adapter/relay/llm/windsurf"
@@ -542,11 +542,7 @@ func (h *AdminHandler) modelsByProvider() map[string][]string {
 }
 
 func (h *AdminHandler) adminPassword() string {
-	value := strings.TrimSpace(h.env.GetString("server.password"))
-	if value != "" {
-		return value
-	}
-	return strings.TrimSpace(os.Getenv("PASSWORD"))
+	return common.ResolveServerPassword(h.env)
 }
 
 func (h *AdminHandler) signSession() (string, error) {

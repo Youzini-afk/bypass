@@ -120,7 +120,7 @@ func (api *api) Match(ctx *gin.Context, model string) (ok bool, err error) {
 			continue
 		}
 
-		password := api.env.GetString("server.password")
+		password := common.ResolveServerPassword(api.env)
 		if password != "" && password != token {
 			err = response.UnauthorizedError
 			return
