@@ -11,7 +11,7 @@ COPY . .
 
 RUN go install -ldflags="-s -w" -trimpath ./cmd/iocgo
 RUN CGO_ENABLED=0 go build -toolexec /go/bin/iocgo -ldflags="-s -w" -trimpath -o /out/server ./main.go
-RUN if [ -f config.yaml ]; then cp config.yaml /out/config.yaml; else : > /out/config.yaml; fi
+RUN if [ -f config.yaml ]; then cp config.yaml /out/config.yaml; else printf 'server:\n  port: ${PORT}\n  password: ${PASSWORD}\n' > /out/config.yaml; fi
 
 FROM alpine:3.20
 
@@ -28,4 +28,4 @@ ENV PORT=8080
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "if [ ! -s ./config.yaml ]; then rm -f ./config.yaml; fi; exec ./server"]
+CMD ["./server"]
